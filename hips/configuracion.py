@@ -45,6 +45,7 @@ def insertar_md5sum(password, shadow):
     print(query)
 
     #Manejo de excepciones
+
     try:
         cursor.execute(query)
         conexion.commit()
@@ -55,4 +56,28 @@ def insertar_md5sum(password, shadow):
     #cerramos la conexion
     conexion.close()
 
+#Funcion: Para crear los logs y directorios necesarios
+def creacion_log_dir():
+    try:
+        #Para almacenar alarmas y prevenciones:
+        #Para crear directorio correspondiente a hips
+        os.system('sudo mkdir /var/log/hips')
+        #Para crear archivo alarmas.log 
+        os.system('sudo touch /var/log/hips/alarmas.log')
+        #Para crear archivo de prevenciones 
+        os.system('sudo touch /var/log/hips/prevencion.log')
+        #Para crear la carpeta de cuarentena 
+        os.system('sudo mkdir /tmp/cuarentena')
+        #Cambiamos los permisos para escritura y lectura
+        os.system('sudo chmod 644 /tmp/cuarentena')
 
+    except:
+        print('Error creando ficheros')
+
+#Main
+def main():
+    creacion_log_dir()
+    md5_original()
+
+if '__main__' == __name__:
+  main()
