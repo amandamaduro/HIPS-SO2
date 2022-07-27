@@ -8,7 +8,7 @@ import subprocess
 import smtplib
 import os
 from dotenv import load_dotenv
-import alarmas_log
+from alarmas_log import (alarmas_logger)
 
 # Take environment variables from .env.
 load_dotenv()
@@ -39,7 +39,8 @@ def tam_cola_correo():
     #Si recibe un mensaje de que esta vacio
     if "queue is empty" in output:
         print("La cola de mail esta vacia")
-        mensaje_final = 'La cola esta vacia'
+        #como prueba
+        alarma_log('COLA VACIA.',ip)
     else:
         #Si no esta vacio, se verifica que supere el limite 
         mail_list = output.decode("utf-8").splitlines()
@@ -47,9 +48,8 @@ def tam_cola_correo():
         if len(mail_list) > TAM_MAX:
             # Enviar correo a usuario y agregar al logger alarmas
             enviar_correo('ALARMA/WARNING','CORREO COLA', 'La cola de correo supera el limite establecido.')
-            alarma_log('La cola de correo supera el limite establecido.',ip)
-
-
+            mensaje =' La cola de correo supera el limite establecido. \n'  
+            alarmas_logger.warn(mensaje)
 
 def main():
     tam_cola_correo()
