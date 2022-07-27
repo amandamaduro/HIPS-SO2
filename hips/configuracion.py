@@ -1,36 +1,58 @@
-'''import subprocess
+import subprocess
 import os
 import psycopg2
 import string
-import configparser
+from configparser import ConfigParser
 
-# Funcion: 
-#
-# Esta funcion tiene como objetivo almacenar en la base de datos los primeros md5sum generados
-#
-def send_to_db(pasword, shadow):
-    #buscamos las credenciales
-    config = configparser.ConfigParser()
-    config.read('secret.ini')
+#Funcion: Generar las firmas de password y de shadow 
+def md5_original():
+     #Calculamos el hash generado por md5 de /etc/passwd 
+    md5= subprocess.Popen('md5sum /etc/passwd', stdout=subprocess.PIPE, shell=True)
+    (out,err) =md5.communicate()
+    #Para que sea legible 
+    md5_p= out.decode('utf-8')
+    #Separamos la parte que corresponde al hash
+    md5_p= md5_p.split(' ')[0]
+    #Realizamos mismo procedimiento para el /etc/shadow
+    md5= subprocess.Popen('md5sum /etc/shadow', stdout=subprocess.PIPE, shell=True)
+    (out,err) =md5.communicate()
+    md5_s= out.decode('utf-8')
+    md5_s= md5_s.split(' ')[0]
+    #enviamos a la base de datos
+    insertar_md5sum(md5_p, md5_s)
+
+# Funcion: Para almacenar los md5sum generados originalmente en la base de datos
+# Param: los hash de etc/passwd y etc/shadow 
+def insertar_md5sum(password, shadow):
+    #Buscamos credenciales para acceder a base de datos
+    #Establecemos ruta del archivo 
+    path = '/'.join((os.path.abspath(__file__).replace('\\', '/')).split('/')[:-1])
+    
+    config = ConfigParser()
+    config.read(os.path.join(path, 'database.ini'))
     name_db = config['DEFAULT']['DB_NAME']
     usr_db = config['DEFAULT']['DB_USER']
     pass_db = config['DEFAULT']['DB_PASSWORD']
-    #establecemos la conexion
-    conn = psycopg2.connect(database=name_db, user=usr_db, password=pass_db)
+    #Conexion a la base de datos 
+    conexion = psycopg2.connect(database = name_db, user = usr_db, password = pass_db)
+    
+    #Para interactuar con la base de datos 
+    cursor = conexion.cursor()
 
-    #creamos el objeto curso para interactuar con la BD
-    curr = conn.cursor()
 
     #escribimos el query de creacion de BD
-    sql = "INSERT INTO md5sum (file, num_hash) VALUES ('/etc/passwd','" + tp + "'),('/etc/shadow','" + ts + "');"
-    #sql = "select * from md5sum;" 
-    print(sql)
+    query = "INSERT INTO md5sum (file, num_hash) VALUES ('/etc/passwd','" + password + "'),('/etc/shadow','" + shadow + "');"
+    print(query)
+
+    #Manejo de excepciones
     try:
-        curr.execute(sql)
-        conn.commit()
-        print("Carga de datos realizada exitosamente.")
+        cursor.execute(query)
+        conexion.commit()
+        print("Se han cargado las firmas de manera exitosa")
     except psycopg2.Error:
         print("ERROR.")
 
     #cerramos la conexion
-    conn.close()'''
+    conexion.close()
+
+

@@ -10,7 +10,8 @@ import os
 #Funcion: Conecta la base de datos del HIPS para poder realizar consultas varias
 #Param: Opcion que deseamos consultar
 def conexion_bd(op):
-    #buscamos las credenciales
+    #Buscamos credenciales para acceder a base de datos
+    #Establecemos ruta del archivo 
     path = '/'.join((os.path.abspath(__file__).replace('\\', '/')).split('/')[:-1])
     
     config = ConfigParser()
@@ -18,7 +19,7 @@ def conexion_bd(op):
     name_db = config['DEFAULT']['DB_NAME']
     usr_db = config['DEFAULT']['DB_USER']
     pass_db = config['DEFAULT']['DB_PASSWORD']
-    #nos conectamos a la base de datos
+    #Conexion a la base de datos 
     conexion = psycopg2.connect(database = name_db, user = usr_db, password = pass_db)
     
     cursor = conexion.cursor()
@@ -56,12 +57,6 @@ def conexion_bd(op):
     #Cerramos conexion con la base de datos 
     conexion.close()
  
-if __name__ == '__main__':
-    conexion_bd(1)
-    
-    
-    
-    
         
 #Funcion: Verificar archivos binarios de sistema y en particular modificaciones realizadas
 #         en el archivo /etc/passwd o /etc/shadow. Hace uso de la herramienta 
@@ -127,3 +122,5 @@ def alarmas_log(tipo_alarma, ip_fuente):
     a = subprocess.Popen("sudo bash -c 'echo " + alarma + " >> /var/log/hips/alarmas.log'", stdout=subprocess.PIPE, shell=True)
     (out, err) = a.communicate()
 
+if __name__ == '__main__':
+    conexion_bd(1)
