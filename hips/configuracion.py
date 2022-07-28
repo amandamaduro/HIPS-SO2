@@ -44,7 +44,7 @@ def insertar_md5sum(dir_binarios):
                 directorios.append(rutas + '/'+ elemento)
         #Si es un archivo
         else:
-            directorios = [rutas]
+            directorios.append(rutas)
 
     for e in directorios:
         #Formamos el comando para generar las firmas 

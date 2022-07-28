@@ -16,6 +16,7 @@ import smtplib
 import time
 import psycopg2
 import alarmas_log
+import configuracion
 
 #Variables globales (varias)
 SERVIDOR = "smtp-mail.outlook.com"
@@ -28,7 +29,7 @@ msg = MIMEMultipart()
 
 #Funcion: Conecta la base de datos del HIPS para poder realizar consultas varias
 #Param: Opcion que deseamos consultar
-def conexion_bd(op):
+def conexion_bd(op, archivo):
     #Buscamos credenciales para acceder a base de datos
     #Establecemos ruta del archivo 
     path = '/'.join((os.path.abspath(__file__).replace('\\', '/')).split('/')[:-1])
@@ -47,15 +48,21 @@ def conexion_bd(op):
     #Queries segun opcion como parametro
     #1 Query para mostrar Archivos 
     if op==1: 
-        query= '''SELECT (firma) FROM binarios;'''
         try:
-            cursor.execute(query)
+            cursor.execute("SELECT archivo FROM binarios WHERE archivo=%s", (archivo, ))
             result = cursor.fetchall()
-            #print (result)
-            return result
+            #print(result)
+            if result:
+                cursor.execute("SELECT firma FROM binarios WHERE archivo=%s", (archivo, ))
+                md5_original=cursor.fetchone()[0]
+                return md5_original
+            else:
+                #Archivo no existe en la base de datos, generamos alarma
+                alarmas_log.alarmas_logger.warn("Archivo '{0}' no encontrado en la base de datos.".format(archivo))
+                enviar_correo('ALARMA/WARNING','ARCHIVOS BINARIOS', 'Archivo no encontrado en la base de datos. Por favor revisar /var/log/hips/alarmas.log para mas informacion')
         #Para manejar algun error al hacer la consulta
-        except psycopg2.Error:
-            print("ERROR.")
+        except psycopg2.Error as error:
+            print("Error: {}".format(error))
     #2 Query para mostrar Logins
     elif op==2:
         query= '''SELECT * FROM login''';
@@ -92,55 +99,49 @@ def conexion_bd(op):
 #Funcion: Verificar archivos binarios de sistema y en particular modificaciones realizadas
 #         en el archivo /etc/passwd o /etc/shadow. Hace uso de la herramienta 
 #         md5sum
-def verificar_md5sum():
-    #Calculamos el hash generado por md5 de /etc/passwd 
-    md5= subprocess.Popen('sudo md5sum /etc/passwd', stdout=subprocess.PIPE, shell=True)
-    (out,err) =md5.communicate()
-    #Para que sea legible 
-    md5_p= out.decode('utf-8')
-    #Separamos la parte que corresponde al hash
-    md5_p= md5_p.split(' ')[0]
-    #Realizamos mismo procedimiento para el /etc/shadow
-    md5= subprocess.Popen('sudo md5sum /etc/shadow', stdout=subprocess.PIPE, shell=True)
-    (out,err) =md5.communicate()
-    md5_s= out.decode('utf-8')
-    md5_s= md5_s.split(' ')[0]
-    #Consultamos registros existentes en la base de datos 
-    consulta= conexion_bd(1)
-    #Extraemos los registros que necesitamos 
-    cmd5_p = consulta[0]
-    cmd5_s = consulta[1]
+def verificar_md5sum(dir_binarios):
+    #Lista para almacenar las firmas creadas por los archivos 
+    directorios=[] 
+    for rutas in dir_binarios:
+        #Si es un directorio
+        if os.path.isdir(rutas):
+            auxiliar= os.listdir(rutas)
+            #Para agregar las rutas de los archivos dentro del directorio binario
+            for elemento in auxiliar:
+                directorios.append(rutas + '/'+ elemento)
+        #Si es un archivo
+        else:
+            directorios.append(rutas)
 
-    #Hacemos la comparacion 
-    (aux, mensaje)= comparar_md5(md5_p, cmd5_p, md5_s, cmd5_s)
+    for e in directorios:
+        #Formamos el comando para generar las firmas 
+        comando = "sudo md5sum "+ str(e)
+        salida=subprocess.Popen(comando, stdout=subprocess.PIPE, shell=True)
+        (out,err) =salida.communicate()
+        #Para que sea legible 
+        firma_act= out.decode('utf-8')
+        #Separamos la parte que corresponde al hash
+        firma_act= firma_act.split(' ')[0]
+        consulta= conexion_bd(1, e)
+        #Hacemos la comparacion 
+        (aux, mensaje)= comparar_md5(consulta, firma_act)
+        if aux== False:
+            print("No coinciden. Archivo modificado:", e)
+            alarmas_log.alarmas_logger.warn("md5sum diferente. Archivos modificado: '{0}'.".format(e))
+            enviar_correo('ALARMA/WARNING','ARCHIVOS BINARIOS', 'Archivo modificado. Por favor revisar /var/log/hips/alarmas.log para mas informacion')
+            return mensaje
     if aux==True:
-        print("No se han modificado.")
-    if aux== False:
-        print("No coinciden")
-        #Se envia el correo y se registra en el logger
-        enviar_correo('ALARMA/WARNING','MD5SUM', 'Md5sum es diferente. Archivos modificados!') 
-        alarmas_log.alarmas_logger.warn("Md5sum es diferente. Archivos modificados!")
-    return mensaje
+        print("Ningun archivo binario fue modificado. ")
 
 #Funcion: para comparar los hash que estan en la BD y los generados por el hips
 #Param: hash de la BD y hash del hips
-def comparar_md5(md5_p, cmd5_p, md5_s, cmd5_s):
+def comparar_md5(consulta, firma_act):
     aux = True
     mensaje = "No hubo cambios en el archivo"
-    #/etc/passwd
-    temp = cmd5_p[0]
-    print(temp)
-    print(md5_p)
-    if temp != md5_p:
+    #Para comparar 
+    if consulta != firma_act:
         aux = False
-        mensaje= ''
-        mensaje= "/etc/passwd fue editado."
-    #/etc/shadow
-    temp = cmd5_s[0]
-    if temp != md5_s:
-        aux = False
-        mensaje= "/etc/passwd y /etc/shadow fueron editados, no coinciden las md5sum."
-
+        mensaje= "Hubo modificacion en el archivo"
     return (aux,mensaje)
 
 # Funcion que envia un correo al Administrador una vez detectada una alarma (SMTP)
@@ -220,7 +221,7 @@ def analizar_proceso():
                 enviar_correo('ALARMA/WARNING','PROCESO SOSPECHOSO MATADO', 'Se mato el proceso ' + proceso_pid +' por alto consumo sospechoso.')
        
 def main():
-    #verificar_md5sum()
+    verificar_md5sum(configuracion.dir_binarios)
     #tam_cola_correo()
     #analizar_proceso()
     
