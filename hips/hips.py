@@ -4,13 +4,16 @@ from asyncio import subprocess
 import configparser
 import datetime
 from datetime import datetime
+import delegator
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+import errno
 import os
 import smtplib
 import ssl
 import subprocess
 import smtplib
+import time
 import psycopg2
 import alarmas_log
 
@@ -67,6 +70,15 @@ def conexion_bd(op):
     elif op==3:
         query= '''SELECT * FROM sniffer''';
         try:
+            cursor.execute(query)
+            result = cursor.fetchall()
+            return result
+        except psycopg2.Error:
+            print("ERROR.")
+    #4 Query para Procesos
+    elif op==4:
+        try:
+            query= '''SELECT nombre_programa FROM lista_blanca''';
             cursor.execute(query)
             result = cursor.fetchall()
             return result
@@ -165,11 +177,52 @@ def tam_cola_correo():
         if len(mail_list) > TAM_MAX:
             # Enviar correo a usuario y agregar al logger alarmas
             enviar_correo('ALARMA/WARNING','CORREO COLA', 'La cola de correo supera el limite establecido.')
-           
+            alarmas_log.alarmas_logger.warn("La cola de correo supera el limite establecido.")
 
+# Funcion para matar un proceso dato su PID
+def matar_proceso(pid):
+    comando = "sudo kill -9 " + str(pid)
+    delegator.run(comando)
+
+# Procedemos a encontrar los procesos que superen el limite establecido de consumo ram y terminarlos
+def analizar_proceso():
+    #Porcentaje minimo de uso de CPU por un proceso sospechoso
+    max_uso = 70
+    #Se almacenan en una lista los procesos que cumplen con las especificaciones
+    comando = """sudo ps aux | awk '{print $2, $4, $11}' | sort -k2r | awk '{if($2>"""+str(max_uso)+""") print($0)}'"""
+    c = delegator.run(comando)
+    lista = c.out.split('\n')
+    #Consultamos registros existentes en la base de datos 
+    consulta = conexion_bd(4)
+    print(lista)
+    #Se verifica cada proceso por nombre y pid
+    for proceso in lista:
+        if len(proceso) != 0:
+            proceso_nombre = proceso.split()[2].split('/')[-1] 
+            proceso_pid = proceso.split()[0]
+            blanca = 0
+            #Se verifica que si pertenece a la lista blanca
+            for proceso_blanca in consulta:
+                if(proceso_nombre == proceso_blanca):
+                    # Se identifica como un proceso seguro
+                    blanca = 1 
+                    print("Proceso seguro")
+                    break
+            # No se considera como un proceso seguro, se toman medidas
+            if blanca == 0 : 
+                #ALARMA
+                alarmas_log.alarmas_logger.warn('El proceso ' + proceso_pid +' se identifico como sospechoso por alto consumo.')
+                enviar_correo('ALARMA/WARNING','PROCESO SOSPECHOSO', 'El proceso ' + proceso_pid +' se identifico como sospechoso por alto consumo.')
+                #PREVENCION
+                #Matamos el proceso
+                matar_proceso(proceso_pid)
+                alarmas_log.alarmas_logger.warn('Se mato el proceso ' + proceso_pid +' por alto consumo sospechoso.')
+                enviar_correo('ALARMA/WARNING','PROCESO SOSPECHOSO MATADO', 'Se mato el proceso ' + proceso_pid +' por alto consumo sospechoso.')
+       
 def main():
-    verificar_md5sum()
-    tam_cola_correo()
+    #verificar_md5sum()
+    #tam_cola_correo()
+    #analizar_proceso()
     
 if __name__=='__main__':
         main()
