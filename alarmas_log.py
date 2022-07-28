@@ -1,5 +1,4 @@
 import logging
-
 from logging import FileHandler
 from logging import Formatter
 
@@ -11,4 +10,3 @@ alarmas_logger.setLevel(LOG_LEVEL)
 alarmas_logger_file_handler = FileHandler(ALARMAS_LOG_FILE)
 alarmas_logger_file_handler.setFormatter(Formatter(LOG_FORMAT))
 alarmas_logger.addHandler(alarmas_logger_file_handler)
-
