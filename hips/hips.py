@@ -212,18 +212,19 @@ def analizar_proceso():
             # No se considera como un proceso seguro, se toman medidas
             if blanca == 0 : 
                 #ALARMA
-                alarmas_log.alarmas_logger.warn('El proceso ' + proceso_pid +' se identifico como sospechoso por alto consumo.')
-                enviar_correo('ALARMA/WARNING','PROCESO SOSPECHOSO', 'El proceso ' + proceso_pid +' se identifico como sospechoso por alto consumo.')
+                str_pid   = str(proceso_pid)
+                alarmas_log.alarmas_logger.warn('[ALARMA]: El proceso ' + str_pid +' se identifico como sospechoso por alto consumo.')
+                enviar_correo('ALARMA/WARNING','PROCESO SOSPECHOSO', 'El proceso ' + str_pid +' se identifico como sospechoso por alto consumo.')
                 #PREVENCION
                 #Matamos el proceso
                 matar_proceso(proceso_pid)
-                alarmas_log.alarmas_logger.warn('Se mato el proceso ' + proceso_pid +' por alto consumo sospechoso.')
-                enviar_correo('ALARMA/WARNING','PROCESO SOSPECHOSO MATADO', 'Se mato el proceso ' + proceso_pid +' por alto consumo sospechoso.')
+                alarmas_log.prevencion_logger.warn('[PREVENCION]: Se mato el proceso ' + str_pid +' por alto consumo sospechoso.')
+                enviar_correo('PREVENCION','PROCESO SOSPECHOSO MATADO', 'Se mato el proceso ' + str_pid +' por alto consumo sospechoso.')
        
 def main():
-    verificar_md5sum(configuracion.dir_binarios)
+    #verificar_md5sum(configuracion.dir_binarios)
     #tam_cola_correo()
     #analizar_proceso()
-    
+
 if __name__=='__main__':
         main()

@@ -10,3 +10,10 @@ alarmas_logger.setLevel(LOG_LEVEL)
 alarmas_logger_file_handler = FileHandler(ALARMAS_LOG_FILE)
 alarmas_logger_file_handler.setFormatter(Formatter(LOG_FORMAT))
 alarmas_logger.addHandler(alarmas_logger_file_handler)
+
+PREVENCION_LOG_FILE = "/var/log/hips/prevencion.log"
+prevencion_logger = logging.getLogger("var.log.hips.prevencion")
+prevencion_logger.setLevel(LOG_LEVEL)
+prevencion_logger_file_handler = FileHandler(PREVENCION_LOG_FILE)
+prevencion_logger_file_handler.setFormatter(Formatter(LOG_FORMAT))
+prevencion_logger.addHandler(prevencion_logger_file_handler)
