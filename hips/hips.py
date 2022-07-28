@@ -1,5 +1,5 @@
 #!/usr/bin/python
-import datetime
+from datetime import datetime
 import smtplib
 import subprocess
 from configparser import ConfigParser 
@@ -23,14 +23,16 @@ def conexion_bd(op):
     conexion = psycopg2.connect(database = name_db, user = usr_db, password = pass_db)
     
     cursor = conexion.cursor()
-        
+    #if conexion:
+    #   print("FUCIONAAAAAA")    
     #Queries segun opcion como parametro
     #1 Query para mostrar Archivos 
     if op==1: 
-        query= '''SELECT (num_hash) FROM md5sum;'''
+        query= '''SELECT (firma) FROM md5sum;'''
         try:
             cursor.execute(query)
             result = cursor.fetchall()
+            #print (result)
             return result
         #Para manejar algun error al hacer la consulta
         except psycopg2.Error:
@@ -40,6 +42,7 @@ def conexion_bd(op):
         query= '''SELECT * FROM login''';
         try:
             cursor.execute(query)
+            #print("Lo que hay es: ", cursor.rowcount)
             result = cursor.fetchall()
             return result
         except psycopg2.Error:
@@ -63,14 +66,14 @@ def conexion_bd(op):
 #         md5sum
 def verificar_md5sum():
     #Calculamos el hash generado por md5 de /etc/passwd 
-    md5= subprocess.Popen('md5sum /etc/passwd', stdout=subprocess.PIPE, shell=True)
+    md5= subprocess.Popen('sudo md5sum /etc/passwd', stdout=subprocess.PIPE, shell=True)
     (out,err) =md5.communicate()
     #Para que sea legible 
     md5_p= out.decode('utf-8')
     #Separamos la parte que corresponde al hash
     md5_p= md5_p.split(' ')[0]
     #Realizamos mismo procedimiento para el /etc/shadow
-    md5= subprocess.Popen('md5sum /etc/shadow', stdout=subprocess.PIPE, shell=True)
+    md5= subprocess.Popen('sudo md5sum /etc/shadow', stdout=subprocess.PIPE, shell=True)
     (out,err) =md5.communicate()
     md5_s= out.decode('utf-8')
     md5_s= md5_s.split(' ')[0]
@@ -82,6 +85,8 @@ def verificar_md5sum():
 
     #Hacemos la comparacion 
     (aux, mensaje)= comparar_md5(md5_p, cmd5_p, md5_s, cmd5_s)
+    if aux==True:
+        print("No se han modificado.")
     if aux== False:
         print("No coinciden")
         alarmas_log("md5sum diferente. Archivos modificados.", '')
@@ -123,4 +128,4 @@ def alarmas_log(tipo_alarma, ip_fuente):
     (out, err) = a.communicate()
 
 if __name__ == '__main__':
-    conexion_bd(1)
+    verificar_md5sum()

@@ -9,9 +9,9 @@ import subprocess
 import smtplib
 import os
 import sys
-from redmail import outlook
+#from redmail import outlook
 #from dotenv import load_dotenv
-#import alarmas_log
+import alarmas_log
 
 #Variables globales (varias)
 SERVIDOR = "smtp-mail.outlook.com"
@@ -47,6 +47,7 @@ def tam_cola_correo():
     if b'queue is empty' in output:
         print("La cola de mail esta vacia")
         enviar_correo('ALARMA/WARNING','CORREO COLA', 'La cola esta vacia') #para probar
+        alarmas_log.alarmas_logger.warn("Hola")
     else:
         #Si no esta vacio, se verifica que supere el limite 
         mail_list = output.decode("utf-8").splitlines()
@@ -54,7 +55,7 @@ def tam_cola_correo():
         if len(mail_list) > TAM_MAX:
             # Enviar correo a usuario y agregar al logger alarmas
             enviar_correo('ALARMA/WARNING','CORREO COLA', 'La cola de correo supera el limite establecido.')
-            #alarmas_log.alarmas_logger.warn(mensaje)
+            
 
 def main():
     tam_cola_correo()
