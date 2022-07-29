@@ -372,14 +372,70 @@ def verificar_log_maillog():
         else:
             contador_registro[correo] = 1 
 
+#Funcion: Deteccion de si la maquina se encuentra en modo promiscuo
+#       Analizamos el archivo var/log/messages
+def modo_promiscuo():
+    comando = subprocess.Popen('ip a show enp0s3 | grep -i promisc', stdout=subprocess.PIPE, shell=True)
+    (out, err)= comando.communicate()
+    promiscuo = out.decode('utf-8')
+    #print (promiscuo)
+    #Se detecta dispositivo en modo promiscuo
+    if promiscuo != '':
+        #Se registra en alarmas.log y se envia un correo notificando modo promiscuo
+        print("La maquina se encuentra en modo promiscuo")
+        alarmas_log.alarmas_logger.warn('Se ha detectado dispositivo (servidor enp0s3) se encuentra en modo promiscuo')
+        enviar_correo('ALARMA/WARNING','DISPOSITIVO MODO PROMISCUO', 'Se ha detectado que el/los dispositivo/s se encuentra en modo promiscuo. Revise /var/log/hips/alarmas.log para mas informacion.')
+
+    #Para saber si hay otro dispositivo en modo promiscuo
+    #Revisamos en el directorio /var/log/secure historial de comandos relacionados con el modo promiscuo
+    #Hacemos un analisis con ip link set [interface] promisc on/off
+    comando1= subprocess.Popen('sudo cat /var/log/messages | grep "entered promisc"', stdout=subprocess.PIPE, shell=True)
+    (out, err) = comando1.communicate()
+    c1 = out.decode('utf-8')
+    comando2= subprocess.Popen('sudo cat /var/log/messages | grep "left promisc"', stdout=subprocess.PIPE, shell=True)
+    (out, err) = comando2.communicate()
+    c2 = out.decode('utf-8')
+    #convertimos en listas
+    promiscuo_on = c1.splitlines()
+    promiscuo_off = c2.splitlines()
+    #print(promiscuo_on)
+    #print(promiscuo_off)
+    p_on = len(promiscuo_on)
+    p_off = len(promiscuo_off)
+    if p_on != p_off:
+        #Lista para comparar entre on/off
+        comp=[]
+        #Lista para almacenar dispositivos que estan en modo promiscuo
+        disp_on=[]
+        for i in promiscuo_off:
+            comp.append(i.split()[-4])
+        for j in promiscuo_on:
+            comp.append(j.split()[-4])
+
+        contador={i:comp.count(i) for i in comp}
+        for d in contador:
+            #Analizamos si se prendio y no apago
+            if contador[d]%2 != 0:
+                disp_on.append(d)
+        for d in disp_on:
+            print(d+ ": En modo promiscuo")
+            alarmas_log.alarmas_logger.warn('Se ha detectado dispositivo' +d +'se encuentra en modo promiscuo')
+            enviar_correo('ALARMA/WARNING','DISPOSITIVO MODO PROMISCUO', 'Se ha detectado que el/los dispositivo/s se encuentra en modo promiscuo. Revise /var/log/hips/alarmas.log para mas informacion.')
+
+    else:
+        mensaje='La maquina no esta en modo promiscuo'
+        print(mensaje)
+        return mensaje
+
 def main():
     #verificar_md5sum(configuracion.dir_binarios)
     #tam_cola_correo()
     #analizar_proceso()
     #verificar_log_secure()
     #verificar_log_messages()
-    verificar_log_maillog()
+    #verificar_log_maillog()
     #verificar_usuarios()
+    modo_promiscuo()
 
 if __name__=='__main__':
         main()
