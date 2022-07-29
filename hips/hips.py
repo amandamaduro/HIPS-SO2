@@ -330,6 +330,47 @@ def verificar_log_messages():
         else:
             contador_registro[usuario] = 1 
 
+#Funcion que agrega correo a la lista negra
+def bloquear_correo(correo):
+    try:
+        cmd = f"sudo echo '{correo} REJECT' >> /etc/postfix/sender_access"
+        os.system(cmd) 
+        os.system("sudo postmap hash:/etc/postfix/sender_access") # creamos la base de datos con el comando postmap
+    except Exception:
+        print("Error para cargas en la lista negra")
+
+def verificar_log_maillog():
+
+    #Se busca todos los registros de correos enviados
+    p = subprocess.Popen("cat /var/log/maillog | grep -i authid", stdout=subprocess.PIPE, shell=True)
+    (output, err) = p.communicate()
+    registro = output.decode("utf-8")
+    contador_registro = dict()
+
+    #Se recorre cada linea del registro y se almacena el correo
+    for linea in registro.splitlines():
+        # Se obtiene el correo 
+        correo = [word for word in linea.split() if 'authid=' in word][0]
+        # Se borra la coma final
+        correo = correo[:-1]
+        # Se quita el authid=
+        correo = correo.split('=')[-1]
+ 
+        #Se cuenta la cantidad de correos enviados
+        if correo in contador_registro:
+            contador_registro[correo]+=1 
+            
+            #Si se detectan 50 envios, se considera envio masivo
+            if contador_registro[correo] == 50:
+                #Se notifica al administrador y se registra en el logger
+                alarmas_log.alarmas_logger.warn('[ALARMA]: Envio masivo de correos por parte de:  ' + correo + '.')
+                enviar_correo('ALARMA/WARNING','CORREO SOSPECHOSO', 'Envio masivo de correos por parte de:  ' + correo + '.')                
+                #Se bloquea el correo por precaucion
+                bloquear_correo(correo)
+                alarmas_log.prevencion_logger.warn('[PREVENCION]: Se bloqueo el correo:  ' + correo +' por envio masivo.')
+                enviar_correo('PREVENCION','CORREO BLOQUEADO', 'Se bloqueo el correo:  ' + correo +' por envio masivo.')               
+        else:
+            contador_registro[correo] = 1 
 
 def main():
     #verificar_md5sum(configuracion.dir_binarios)
@@ -337,6 +378,7 @@ def main():
     #analizar_proceso()
     #verificar_log_secure()
     #verificar_log_messages()
+    verificar_log_maillog()
     #verificar_usuarios()
 
 if __name__=='__main__':
