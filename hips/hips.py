@@ -31,7 +31,7 @@ msg = MIMEMultipart()
 
 #Funcion: Conecta la base de datos del HIPS para poder realizar consultas varias
 #Param: Opcion que deseamos consultar
-def conexion_bd(op, archivo):
+def conexion_bd(op, arg1):
     #Buscamos credenciales para acceder a base de datos
     #Establecemos ruta del archivo 
     path = '/'.join((os.path.abspath(__file__).replace('\\', '/')).split('/')[:-1])
@@ -51,30 +51,28 @@ def conexion_bd(op, archivo):
     #1 Query para mostrar Archivos 
     if op==1: 
         try:
-            cursor.execute("SELECT archivo FROM binarios WHERE archivo=%s", (archivo, ))
+            cursor.execute("SELECT archivo FROM binarios WHERE archivo=%s", (arg1, ))
             result = cursor.fetchall()
             #print(result)
             if result:
-                cursor.execute("SELECT firma FROM binarios WHERE archivo=%s", (archivo, ))
+                cursor.execute("SELECT firma FROM binarios WHERE archivo=%s", (arg1, ))
                 md5_original=cursor.fetchone()[0]
                 return md5_original
             else:
                 #Archivo no existe en la base de datos, generamos alarma
-                alarmas_log.alarmas_logger.warn("Archivo '{0}' no encontrado en la base de datos.".format(archivo))
+                alarmas_log.alarmas_logger.warn("Archivo '{0}' no encontrado en la base de datos.".format(arg1))
                 enviar_correo('ALARMA/WARNING','ARCHIVOS BINARIOS', 'Archivo no encontrado en la base de datos. Por favor revisar /var/log/hips/alarmas.log para mas informacion')
         #Para manejar algun error al hacer la consulta
         except psycopg2.Error as error:
             print("Error: {}".format(error))
     #2 Query para mostrar Logins
     elif op==2:
-        query= '''SELECT * FROM login''';
         try:
-            cursor.execute(query)
-            #print("Lo que hay es: ", cursor.rowcount)
-            result = cursor.fetchall()
+            cursor.execute("SELECT COUNT (*) FROM usuario where username = %s ", (arg1, ))
+            result = cursor.fetchone()
             return result
-        except psycopg2.Error:
-            print("ERROR.")
+        except psycopg2.Error as error:
+            print("Error: {}".format(error))
     #3 Query para mostrar Sniffers
     elif op==3:
         query= '''SELECT * FROM sniffer''';
@@ -196,7 +194,7 @@ def analizar_proceso():
     c = delegator.run(comando)
     lista = c.out.split('\n')
     #Consultamos registros existentes en la base de datos 
-    consulta = conexion_bd(4)
+    consulta = conexion_bd(4, None)
     print(lista)
     #Se verifica cada proceso por nombre y pid
     for proceso in lista:
@@ -259,12 +257,49 @@ def verificar_error_autentificacion():
         else:
             contador_registro[usuario] = 1
     
-       
+#Funcion: Verificar los usuarios que están conectados. Alamcenarlos en una lista
+def usuarios_conectados():
+    #Para saber que usuarios estan conectados
+    comando= "sudo who | awk '{print($1,$5)}' | sort | uniq | sed 's/(//g' | sed 's/)//g' | sed 's/:0//g'"
+    c=delegator.run(comando)
+    #Separamos por lineas
+    lista = c.out.split('\n')
+    #Lista para alamacenar usaurios conectados
+    lista_usuarios=[]
+    for e in lista:
+        conectado=e.split()
+        #Si es que esta conectado el usuario local
+        if len(conectado)==1:
+            conectado.append('localhost')
+        #Si hay mas conectados 
+        if len(conectado)!=0:
+            lista_usuarios.append(conectado)
+    return lista_usuarios
+
+#Funcion: Saber origen de los usuarios conectados. Si es un usuario desconocido se notifica
+def verificar_usuarios():
+    #Extraer la lista de usuarios conectados 
+    lista= usuarios_conectados()
+
+    #Recorremos cada linea y almacenamos en variables el usuario y direccion
+    for linea in lista:
+        #Extraemos usuario y direccion de un usuario de la lista
+        usuario=linea[0]
+        origen=linea[1]
+        #Realizamos query para consulta en la tabla de usuarios. Revisamos que el usuario se encuentre en la base de datos 
+        consulta=conexion_bd(2, usuario)[0]
+        #Si no coincide, es notificado al administrador
+        if consulta==0:
+            print("No coinciden los datos del usuario. No se encuentra en la base de datos")
+            alarmas_log.alarmas_logger.warn("Usuario no esta regisstrado en la base de datos. Posibilidad de intrusion. Datos:"+usuario+'Origen: ['+origen+']')
+            enviar_correo('ALARMA/WARNING','USUARIO DESCONOCIDO', 'Conexion de un usuario no registrado. Por favor revisar /var/log/hips/alarmas.log para mas informacion')
+
 def main():
     #verificar_md5sum(configuracion.dir_binarios)
     #tam_cola_correo()
     #analizar_proceso()
     #verificar_error_autentificacion()
+    verificar_usuarios()
 
 if __name__=='__main__':
         main()
