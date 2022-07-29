@@ -227,7 +227,7 @@ def contra_random_generador():
     contrasenha = "".join(contrasenha)
     return contrasenha
 
-def verificar_error_autentificacion():
+def verificar_log_secure():
 
     #Se busca en los registros todos aquellos que tuvieron error de autentificacion
     p = subprocess.Popen("cat /var/log/secure | grep -i \"(smtp:auth)\" | grep -i \"authentication failure\"", stdout=subprocess.PIPE, shell=True)
@@ -294,12 +294,50 @@ def verificar_usuarios():
             alarmas_log.alarmas_logger.warn("Usuario no esta regisstrado en la base de datos. Posibilidad de intrusion. Datos:"+usuario+'Origen: ['+origen+']')
             enviar_correo('ALARMA/WARNING','USUARIO DESCONOCIDO', 'Conexion de un usuario no registrado. Por favor revisar /var/log/hips/alarmas.log para mas informacion')
 
+def verificar_log_messages():
+
+    #Se busca en los registros todos aquellos que tuvieron error de autentificacion
+    p = subprocess.Popen("cat /var/log/messages | grep -i \"[service=smtp]\" | grep -i \"auth failure\"", stdout=subprocess.PIPE, shell=True)
+    (output, err) = p.communicate()
+    registro = output.decode("utf-8")
+    contador_registro = dict()
+
+    #Se recorre cada linea del registro y se almacena el usuario
+    for linea in registro.splitlines():
+        # Se obtiene el usuario entre corchetes [user=username]
+        usuario = [word for word in linea.split() if 'user=' in word][0]
+        # Se borran los corchetes
+        usuario = usuario[1:]
+        usuario = usuario[:-1]
+        # Se quita el user=
+        usuario = usuario.split('=')[-1]     
+
+        #Se cuenta la cantidad de intentos fallidos
+        if usuario in contador_registro:
+            contador_registro[usuario]+=1 
+            
+            #Si se detectan mas de 10 intentos fallidos, se toma accion
+            if contador_registro[usuario] == 10:
+                #Se notifica al administrador y se registra en el logger
+                alarmas_log.alarmas_logger.warn('[ALARMA]: Multiples intentos fallidos de ingreso del usuario ' + usuario + '.')
+                enviar_correo('ALARMA/WARNING','USUARIO SOSPECHOSO', 'Multiples intentos fallidos de ingreso del usuario ' + usuario + '.')                
+                #Se cambia la contra por precaucion
+                contra_random_nueva = contra_random_generador()
+                p = subprocess.Popen("echo \"" + usuario + ":" + contra_random_nueva + "\" | chpasswd 2> /dev/null", stdout=subprocess.PIPE, shell=True)
+                (output, err) = p.communicate()
+                alarmas_log.prevencion_logger.warn('[PREVENCION]: Se cambio la contraseña del usuario ' + usuario +' por actividad sospechosa.')
+                enviar_correo('PREVENCION','CAMBIO DE CONTRASEÑA', 'Se cambio la contraseña del usuario ' + usuario +' por actividad sospechosa.')               
+        else:
+            contador_registro[usuario] = 1 
+
+
 def main():
     #verificar_md5sum(configuracion.dir_binarios)
     #tam_cola_correo()
     #analizar_proceso()
-    #verificar_error_autentificacion()
-    verificar_usuarios()
+    #verificar_log_secure()
+    #verificar_log_messages()
+    #verificar_usuarios()
 
 if __name__=='__main__':
         main()
