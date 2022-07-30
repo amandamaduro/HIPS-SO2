@@ -512,10 +512,34 @@ def verificar_log_access():
                 enviar_correo('ALARMA/WARNING','IP SOSPECHOSA', 'Se han encontrado multiples errores de carga de paginas desde la ip:  ' + ip + '.')                
                 bloquear_ip(ip) 
                 alarmas_log.prevencion_logger.warn('[PREVENCION]: Se bloqueo la ip: ' + ip +' por multiples errores de carga de paginas.')
-                enviar_correo('PREVENCION','PROCESO SOSPECHOSO MATADO', 'Se bloqueo la ip: ' + ip +' por multiples errores de carga de paginas.')
+                enviar_correo('PREVENCION','IP BLOQUEADA', 'Se bloqueo la ip: ' + ip +' por multiples errores de carga de paginas.')
 
         else:
             contador[ip] = 1
+def verificar_log_tcpdumps():
+    registro = os.popen("sudo cat /home/amparooliver/Descargas/tcpdump_dns.log").read().split('\n')
+    registro.pop(-1)
+
+    contador = {}
+
+    for linea in registro:
+        #Formato
+        ip_a = linea.split()[2]
+        ip_b = linea.split()[4][:-1] 
+        if (ip_a, ip_b) in contador:
+            contador[(ip_a, ip_b)] = contador[(ip_a, ip_b)] + 1
+            # Si hay 10 registros de ip_a a ip_b
+            if contador[(ip_a, ip_b)] == 10:
+                #Formato
+                ip = ip_a.split('.')[:-1]
+                ip = f"{ip[0]}.{ip[1]}.{ip[2]}.{ip[3]}"            
+                alarmas_log.alarmas_logger.warn('[ALARMA]: Posible ataque DDOS de ip:  ' + ip_a + 'a ip: '+ ip_b)
+                enviar_correo('ALARMA/WARNING','IP SOSPECHOSA', 'Posible ataque DDOS de ip:  ' + ip_a + 'a ip: '+ ip_b)                
+                bloquear_ip(ip) 
+                alarmas_log.prevencion_logger.warn('[PREVENCION]: Se bloqueo la ip: ' + ip +' por multiples errores de carga de paginas.')
+                enviar_correo('PREVENCION','IP BLOQUEADA', 'Se bloqueo la ip: ' + ip +' por multiples errores de carga de paginas.')    
+        else:
+            contador[(ip_a, ip_b)] = 1
 
 def main():
     #verificar_md5sum(configuracion.dir_binarios)
@@ -527,6 +551,7 @@ def main():
     #verificar_usuarios()
     #si_sniffers()
     #verificar_log_access()
+    verificar_log_tcpdumps()
 
 if __name__=='__main__':
         main()
