@@ -467,6 +467,31 @@ def si_app_sniffers():
                 alarmas_log.prevencion_logger.warn('[PREVENCION]: Se elimino el proceso:  ' + p +' por captura de paquetes.')
                 enviar_correo('PREVENCION','PROCESO ELIMINADO Y ENVIADO A CUARENTENA', 'Proceso:  ' + p +' fue eliminado y enviado a cuarentena por capturar paquetes (Sniffer)') 			   
 
+#Funcion: Detectamos si la maquina entro en modo promiscuo segun los registros de auditoria
+def si_promisc_aud():
+    comando = "sudo aureport --anomaly --input-logs | grep ANOM_PROMISCUOUS | awk '{print $5}' | grep -v '?' | sort | uniq"
+    c = delegator.run(comando)
+    lista = c.out.split()
+    for l in lista: # Se detecta dispositivo en modo promiscuo y proceso causante
+        print("Se ha detectado maquina en modo promiscuo causado por proceso: "+ l )
+        alarmas_log.alarmas_logger.warn('Se ha detectado maquina en modo promiscuo causado por proceso: '+ l)
+        enviar_correo('ALARMA/WARNING','MODO PROMISCUO DETECTADO', 'Se ha detectado maquina en modo promiscuo causado por proceso. Revise /var/log/hips/alarmas.log para mas informacion.')
+        # Se cierra el proceso causante
+        matar_proceso_nombre(l)
+        # Se mueve a cuarentena proceso causante
+        cuarentena(l)
+        #Registramos la cuarentena en el log de prevencion y enviamos al mail
+        alarmas_log.prevencion_logger.warn('[PREVENCION]: Se elimino el proceso:  ' + l +'. Causante de que la maquina se encuentre en modo promiscuo.')
+        enviar_correo('PREVENCION','PROCESO ELIMINADO Y EN CUARENTENA (MODO PROMISCUO)', 'Proceso:  ' + l + '. Causante de que la maquina se encuentre en modo promiscuo.')
+
+#Funcion: Chequeo completo de modo promiscuo o sniffers en ejecucion 
+def si_sniffers(): 
+    #determinamos si el equipo entro en modo promiscuo o hay sniffer en ejecucion
+    modo_promiscuo()
+    si_app_sniffers()
+    si_promisc_aud()
+
+
 def main():
     #verificar_md5sum(configuracion.dir_binarios)
     #tam_cola_correo()
@@ -475,8 +500,7 @@ def main():
     #verificar_log_messages()
     #verificar_log_maillog()
     #verificar_usuarios()
-    #modo_promiscuo()
-    si_app_sniffers()
+    si_sniffers()
 
 if __name__=='__main__':
         main()
