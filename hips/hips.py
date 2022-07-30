@@ -491,6 +491,31 @@ def si_sniffers():
     si_app_sniffers()
     si_promisc_aud()
 
+# Se blooquea una IP con iptables
+def bloquear_ip(ip):
+    os.system(f"sudo iptables -I INPUT -s {ip} -j DROP")
+    os.system("sudo service iptables save")
+
+# Funcion que verifica el access log y bloquea ip bajo criterio
+def verificar_log_access():
+    cmd = "sudo cat /home/amparooliver/Descargas/access_log.log | grep -i 'HTTP' | grep -i '404'"
+    registro = os.popen(cmd).read().split('\n')
+    registro.pop(-1)
+    contador = {}
+    for linea in registro:
+        ip =  linea.split()[0]
+        
+        if ip in contador:
+            contador[ip] = contador[ip] + 1
+            if contador[ip] == 10:
+                alarmas_log.alarmas_logger.warn('[ALARMA]: Se han encontrado multiples errores de carga de paginas desde la ip:  ' + ip + '.')
+                enviar_correo('ALARMA/WARNING','IP SOSPECHOSA', 'Se han encontrado multiples errores de carga de paginas desde la ip:  ' + ip + '.')                
+                bloquear_ip(ip) 
+                alarmas_log.prevencion_logger.warn('[PREVENCION]: Se bloqueo la ip: ' + ip +' por multiples errores de carga de paginas.')
+                enviar_correo('PREVENCION','PROCESO SOSPECHOSO MATADO', 'Se bloqueo la ip: ' + ip +' por multiples errores de carga de paginas.')
+
+        else:
+            contador[ip] = 1
 
 def main():
     #verificar_md5sum(configuracion.dir_binarios)
@@ -500,7 +525,8 @@ def main():
     #verificar_log_messages()
     #verificar_log_maillog()
     #verificar_usuarios()
-    si_sniffers()
+    #si_sniffers()
+    #verificar_log_access()
 
 if __name__=='__main__':
         main()
