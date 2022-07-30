@@ -75,7 +75,7 @@ def conexion_bd(op, arg1):
             print("Error: {}".format(error))
     #3 Query para mostrar Sniffers
     elif op==3:
-        query= '''SELECT * FROM sniffer''';
+        query= '''SELECT nombre_sniffer FROM sniffer''';
         try:
             cursor.execute(query)
             result = cursor.fetchall()
@@ -427,6 +427,50 @@ def modo_promiscuo():
         print(mensaje)
         return mensaje
 
+#Funcion: matar proceso dado el nombre del proceso
+def matar_proceso_nombre(nombre):
+    comando = "sudo pidof " + nombre
+    c = delegator.run(comando)
+    pid = c.out
+    matar_proceso(pid) 
+
+#Funcion: Mover a cuarentena archivo o proceso
+def cuarentena(archivo):
+    # Quitamos todos los permisos
+    comando = "sudo chmod a-wxr " + str(archivo)
+    delegator.run(comando)
+    # Crea el directorio de cuarentena
+    comando = "sudo mkdir /tmp/cuarentena"
+    delegator.run(comando)
+    # Mueve al directorio de cuarentena
+    comando = "sudo mv "+str(archivo) +" /tmp/.cuarentena"
+    delegator.run(comando)
+
+#Funcion: Para deteccion de sniffers. Si alguno se encuentra en ejecucio.
+#       Matamos proceso y movemos a cuarentena
+#Comparamos con la lista de aplicaciones sniffers conocidas de la base de datos
+def si_app_sniffers():
+    consulta=conexion_bd(3, None)
+    for aplicacion in consulta:	
+        if len(aplicacion) != 0 :
+		# Buscamos si existe un proceso en ejecucion que sea un sniffer 
+            comando = subprocess.Popen("sudo ls -l /proc/*/exe 2>/dev/null | awk '{print($11)}' | grep " + str(aplicacion[0]), stdout=subprocess.PIPE, shell=True)
+            (out, err)=comando.communicate
+            procesos = out.decode('utf-8')
+            for p in procesos:
+			    #Registramos en el log de alarma y se notifica por correo al detectar que se ha entrado en modo promiscuo
+                print("Proceso: "+ p + " en ejecucion. Sniffer detectado.")
+                alarmas_log.alarmas_logger.warn('Proceso en ejecucion: ' + p +'. Sniffer detectado')
+                enviar_correo('ALARMA/WARNING','SNIFFER DETECTADO', 'Se ha detectado proceso/s en ejecucion que esta/n capturando paquetes. Revise /var/log/hips/alarmas.log para mas informacion.')
+				#Procedemos a matar el proceso          	
+                matar_proceso_nombre(p)
+                # Movemos a cuarentena
+                cuarentena(p) 
+				#Registramos la eliminacion del proceso en el log de prevencion y se notifica
+                alarmas_log.prevencion_logger.warn('[PREVENCION]: Se elimino el proceso:  ' + p +' por captura de paquetes.')
+                enviar_correo('PREVENCION','PROCESO ELIMINADO Y ENVIADO A CUARENTENA', 'Proceso:  ' + p +' fue eliminado y enviado a cuarentena por capturar paquetes (Sniffer)') 			   
+				
+
 def main():
     #verificar_md5sum(configuracion.dir_binarios)
     #tam_cola_correo()
@@ -435,7 +479,8 @@ def main():
     #verificar_log_messages()
     #verificar_log_maillog()
     #verificar_usuarios()
-    modo_promiscuo()
+    #modo_promiscuo()
+    si_app_sniffers()
 
 if __name__=='__main__':
         main()
