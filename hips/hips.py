@@ -435,10 +435,13 @@ def matar_proceso_nombre(nombre):
     matar_proceso(pid) 
 
 #Funcion: Mover a cuarentena archivo o proceso
-def cuarentena(archivo):
+def cuarentena(op, archivo):
     # Quitamos todos los permisos
-    comando = "sudo chmod a-wxr " + str(archivo)
-    delegator.run(comando)
+    if op==1:
+        comando = "sudo chmod a-wxr " + str(archivo)
+        delegator.run(comando)
+    elif op==2:
+        os.system('chmod 400 ' + '/tmp/' + str(archivo))
     # Mueve al directorio de cuarentena
     comando = "sudo mv "+str(archivo) +" /tmp/.cuarentena"
     delegator.run(comando)
@@ -541,6 +544,37 @@ def verificar_log_tcpdumps():
         else:
             contador[(ip_a, ip_b)] = 1
 
+#Funcion: Verificar directorio /tmp; que no hayan procesos con nombres extraños o scripts ubicados en el mismo.
+#         Si se dectecta algun se manda a cuarentena 
+def verificar_tmp():
+    for direccion,_,nombre_arch in os.walk('/tmp'):
+        #Si encontramos algun archivo ejecutable dentro del directorio se notifica y se mueve a cuarentena 
+        for aux in nombre_arch:
+            if (('.py' in aux) or ('.exe' in aux) or ('.sh' in aux) or ('.deb' in aux) or ('.rpm' in aux) or ('.php' in aux) or ('.c' in aux) or ('.cpp' in aux) or ('.perl' in aux) or ('.ruby' in aux)):
+                alarmas_log.alarmas_logger.warn('Se ha detectado archivo ejecutable sospechoso: '+ aux)
+                enviar_correo('ALARMA/WARNING','EJECUTABLE SOSPECHOSO', 'Se ha detectado archivo ejecutable sospechoso. Revise /var/log/hips/alarmas.log para mas informacion.')
+                #Movemos a cuarentena 
+                cuarentena(2, aux)
+                #Notificamos por correo la accion tomada 
+                alarmas_log.prevencion_logger.warn('[PREVENCION]: El archivo ejecutable sospechoso:  ' + aux +' puesto en cuarentena')
+                enviar_correo('PREVENCION','ARCHIVO SOSPECHOSO', 'El archivo ejecutable:  ' + aux + ' se encuentra en cuarentena. Archivo sospechoso.')
+                #avisamos en la terminal que existe un ejecutable sospechoso en /tmp
+                os.system('echo "Ejecutable detectado:' +str(aux)+ ', notificado por correo. Por favor revisar"')
+    #Aplicamos el mismo proceso para el directorio /var/tmp
+    for direccion,_,nombre_arch in os.walk('/var/tmp'):
+        #Si encontramos algun archivo ejecutable dentro del directorio generamos la alarma al administrador 
+        #Y colocamos en cuarentena el ejecutable
+        for aux in nombre_arch:
+            if (('.py' in aux) or ('.exe' in aux) or ('.sh' in aux) or ('.deb' in aux) or ('.rpm' in aux) or ('.php' in aux) or ('.c' in aux) or ('.cpp' in aux) or ('.perl' in aux) or ('.ruby' in aux)):
+                alarmas_log.alarmas_logger.warn('Se ha detectado archivo ejecutable sospechoso: '+ aux + ' en /var/tmp')
+                enviar_correo('ALARMA/WARNING','EJECUTABLE SOSPECHOSO', 'Se ha detectado archivo ejecutable sospechoso. Revise /var/log/hips/alarmas.log para mas informacion.')
+                cuarentena(2, aux)
+                #guardamos el log y notificamos
+                alarmas_log.prevencion_logger.warn('[PREVENCION]: El archivo ejecutable sospechoso:  ' + aux +' en /var/tmp puesto en cuarentena')
+                enviar_correo('PREVENCION','ARCHIVO SOSPECHOSO', 'El archivo ejecutable:  ' + aux + ' se encuentra en cuarentena. Archivo sospechoso.')
+                #avisamos en la terminal que existe un ejecutable sospechoso en /tmp
+                os.system('echo "Ejecutable detectado: ' +str(aux)+ ' notificado por correo. Por favor revisar"')
+
 def main():
     #verificar_md5sum(configuracion.dir_binarios)
     #tam_cola_correo()
@@ -551,7 +585,8 @@ def main():
     #verificar_usuarios()
     #si_sniffers()
     #verificar_log_access()
-    verificar_log_tcpdumps()
+    #verificar_log_tcpdumps()
+    verificar_tmp()
 
 if __name__=='__main__':
         main()
