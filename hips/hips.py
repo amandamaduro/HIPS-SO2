@@ -439,9 +439,6 @@ def cuarentena(archivo):
     # Quitamos todos los permisos
     comando = "sudo chmod a-wxr " + str(archivo)
     delegator.run(comando)
-    # Crea el directorio de cuarentena
-    comando = "sudo mkdir /tmp/cuarentena"
-    delegator.run(comando)
     # Mueve al directorio de cuarentena
     comando = "sudo mv "+str(archivo) +" /tmp/.cuarentena"
     delegator.run(comando)
@@ -454,9 +451,9 @@ def si_app_sniffers():
     for aplicacion in consulta:	
         if len(aplicacion) != 0 :
 		# Buscamos si existe un proceso en ejecucion que sea un sniffer 
-            comando = subprocess.Popen("sudo ls -l /proc/*/exe 2>/dev/null | awk '{print($11)}' | grep " + str(aplicacion[0]), stdout=subprocess.PIPE, shell=True)
-            (out, err)=comando.communicate
-            procesos = out.decode('utf-8')
+            comando = "sudo ls -l /proc/*/exe 2>/dev/null | awk '{print($11)}' | grep " + str(aplicacion[0])
+            c = delegator.run(comando)
+            procesos = c.out.split()
             for p in procesos:
 			    #Registramos en el log de alarma y se notifica por correo al detectar que se ha entrado en modo promiscuo
                 print("Proceso: "+ p + " en ejecucion. Sniffer detectado.")
@@ -464,12 +461,11 @@ def si_app_sniffers():
                 enviar_correo('ALARMA/WARNING','SNIFFER DETECTADO', 'Se ha detectado proceso/s en ejecucion que esta/n capturando paquetes. Revise /var/log/hips/alarmas.log para mas informacion.')
 				#Procedemos a matar el proceso          	
                 matar_proceso_nombre(p)
-                # Movemos a cuarentena
+                #Movemos a cuarentena
                 cuarentena(p) 
 				#Registramos la eliminacion del proceso en el log de prevencion y se notifica
                 alarmas_log.prevencion_logger.warn('[PREVENCION]: Se elimino el proceso:  ' + p +' por captura de paquetes.')
                 enviar_correo('PREVENCION','PROCESO ELIMINADO Y ENVIADO A CUARENTENA', 'Proceso:  ' + p +' fue eliminado y enviado a cuarentena por capturar paquetes (Sniffer)') 			   
-				
 
 def main():
     #verificar_md5sum(configuracion.dir_binarios)
