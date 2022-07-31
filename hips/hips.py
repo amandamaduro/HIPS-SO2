@@ -443,7 +443,7 @@ def cuarentena(op, archivo):
     elif op==2:
         os.system('chmod 400 ' + '/tmp/' + str(archivo))
     # Mueve al directorio de cuarentena
-    comando = "sudo mv "+str(archivo) +" /tmp/.cuarentena"
+    comando = "sudo mv "+str(archivo) +" /tmp/cuarentena"
     delegator.run(comando)
 
 #Funcion: Para deteccion de sniffers. Si alguno se encuentra en ejecucio.
@@ -465,7 +465,7 @@ def si_app_sniffers():
 				#Procedemos a matar el proceso          	
                 matar_proceso_nombre(p)
                 #Movemos a cuarentena
-                cuarentena(p) 
+                cuarentena(1, p) 
 				#Registramos la eliminacion del proceso en el log de prevencion y se notifica
                 alarmas_log.prevencion_logger.warn('[PREVENCION]: Se elimino el proceso:  ' + p +' por captura de paquetes.')
                 enviar_correo('PREVENCION','PROCESO ELIMINADO Y ENVIADO A CUARENTENA', 'Proceso:  ' + p +' fue eliminado y enviado a cuarentena por capturar paquetes (Sniffer)') 			   
@@ -482,7 +482,7 @@ def si_promisc_aud():
         # Se cierra el proceso causante
         matar_proceso_nombre(l)
         # Se mueve a cuarentena proceso causante
-        cuarentena(l)
+        cuarentena(1, l)
         #Registramos la cuarentena en el log de prevencion y enviamos al mail
         alarmas_log.prevencion_logger.warn('[PREVENCION]: Se elimino el proceso:  ' + l +'. Causante de que la maquina se encuentre en modo promiscuo.')
         enviar_correo('PREVENCION','PROCESO ELIMINADO Y EN CUARENTENA (MODO PROMISCUO)', 'Proceso:  ' + l + '. Causante de que la maquina se encuentre en modo promiscuo.')
@@ -600,6 +600,70 @@ def verificar_tarea_cron():
                 alarmas_log.alarmas_logger.warn('[ALARMA]: El usuario: ' + usuario + ' esta ejecutando el archivo: '+ tarea_cron + ' como CRON.')
                 enviar_correo('ALARMA/WARNING','TAREA COMO CRON', 'El usuario: ' + usuario + ' esta ejecutando el archivo: '+ tarea_cron + ' como CRON.')
                 
+#Funcion: Verificar intentos de accesos no válidos. Ya sea desde un mismo usuario
+#intentos repetitivos o desde un IP intentos de accesos con múltiples usuarios.
+def ssh_log_secure():
+    #Extraemos las entradas con contrasehnas fallidas
+    contra_fallada = os.popen("cat /var/log/secure | grep 'Failed password'").read()
+    contra_fallada = contra_fallada.split(os.linesep)
+    contador = []
+    #Recorremos archivo
+    for fila_log in contra_fallada[:-1]:
+        #Capturamos la ip si encontramos la frase "for invalid user"
+        if 'for invalid user' in fila_log:
+            #Para acceder al ip de un usuario no valido
+            ip_sin_acceso= fila_log.split(' ')[12]
+        else:
+            #Para acceder a un ip de un usuario valido
+            ip_sin_acceso= fila_log.split(' ')[10]
+        #Registramos la fecha 
+        fecha = fila_log.split(' ')[0] + fila_log.split(' ')[1]
+        contador.append((fecha, ip_sin_acceso))
+
+    #Creamos una tupla de 2 elementos que almacenan la ip y el contador de acceso 
+    contador_ip= [[i, contador.count(i)] for i in set(contador)]
+    
+    for j in contador_ip:
+    #Establecimos como limite 5 intentos, por tanto si los supera
+        if j[1] > 5: 
+            #Notificamos por correo alarma generada
+            alarmas_log.prevencion_logger.warn('Ip: ' + j[0][1] + 'supero el maximo de intentos de acceso atraves de ssh. Ip bloqueado')
+            enviar_correo('[PREVENCION]','IP ACCESO DENEGADO', 'Ip/usuario supero el limite de intentos de acceso al sistema por SSH. Revise /var/log/hips/prevencion.log para mas informacion.')
+            os.system('echo "\nIp supero los intentos de acceso, ip bloqueado. Revise el correo para mas informacion"')
+            #Bloqueamos ip
+            bloquear_ip(j[0][1])
+    #Extraemos las entradas con acceso fallido
+    acceso_fallado = os.popen('cat /var/log/secure | grep "FAILED LOGIN"').read()
+    acceso_fallado = acceso_fallado.split(os.linesep)
+    cont_usuario = []
+    #Recorremos archivo
+    for fila_log in acceso_fallado[:-1]:
+        #Capturamos la ip si encontramos la frase "for invalid user"
+        if not 'User not known to the underlying authentication module' in fila_log:
+            #Localizamos usuario 
+            ip_sin_acceso= fila_log.split(' ')[11]
+            #Registramos la fecha 
+            fecha = fila_log.split(' ')[0] + fila_log.split(' ')[1]
+            contador.append(fecha, ip_sin_acceso)
+
+    #Creamos una tupla de 2 elementos que almacenan la usuario y el contador de acceso 
+    usuario_log= [[i, cont_usuario.count(i)] for i in set(contador)]
+    for j in usuario_log:
+        #Establecimos como limite 5 intentos, por tanto si los supera
+        if j[1] > 5: 
+            if not 'root' in j[0][1][:-1]:
+                #Si no es root cambiamos la contrasehna 
+                nueva_contra=contra_random_generador()
+                os.system('echo "'+ j[0][1][:-1] + ':'+ nueva_contra + '" | chpasswd')
+                alarmas_log.prevencion_logger.warn('Cambio de contrasenha de: ' + j[0][1][:-1] + ' a ' +nueva_contra +'por superar el maximo de intentos de acceso al sistema')
+                enviar_correo('[PREVENCION]','CAMBIO DE CONTRASEHNA', 'Cambio de contrasenha de: ' + j[0][1][:-1]+ ' por superar limite de intentos de acceso al sistema' + nueva_contra)
+                os.system('echo "\nIp supero los intentos de acceso. Notificacion al correo"')
+            else:
+                #Si es root generamos alarma
+                alarmas_log.alarmas_logger.warn('Usuario root supero limite de intentos de acceso al sistema.' )
+                enviar_correo('ALARMA/WARNING','INTENTO DE ACCESO', 'Usuario root supero limite de intentos de acceso al sistema.')
+                os.system('echo " Usuario root supero los intentos de acceso. Notificacion al correo"')
+
 def main():
     #verificar_md5sum(configuracion.dir_binarios)
     #tam_cola_correo()
@@ -613,6 +677,8 @@ def main():
     #verificar_log_tcpdumps()
     #verificar_tmp()
     #verificar_tarea_cron()
+    ssh_log_secure()
+
 
 if __name__=='__main__':
         main()
