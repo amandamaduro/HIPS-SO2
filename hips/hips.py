@@ -519,6 +519,7 @@ def verificar_log_access():
 
         else:
             contador[ip] = 1
+
 def verificar_log_tcpdumps():
     registro = os.popen("sudo cat /home/amparooliver/Descargas/tcpdump_dns.log").read().split('\n')
     registro.pop(-1)
@@ -575,6 +576,30 @@ def verificar_tmp():
                 #avisamos en la terminal que existe un ejecutable sospechoso en /tmp
                 os.system('echo "Ejecutable detectado: ' +str(aux)+ ' notificado por correo. Por favor revisar"')
 
+#Funcion que verifica si hay tareas ejecutandose como CRON
+def verificar_tarea_cron():
+    #Se obtiene la informacion de usuarios
+    registro = os.popen("sudo cat /etc/passwd").read().split('\n') 
+    registro.pop(-1)
+    #Se analiza cada linea del registro, sacando solo el usuario
+    for linea in registro:
+        usuario = linea.split(':')[0] 
+        tareas = [] 
+        # Se analiza si el usuario tiene tareas que se estan ejecutando como cron
+        try:
+            tareas = os.popen(f"sudo crontab -l -u {usuario}").read().split('\n')
+            tareas.pop(-1)
+        except Exception:
+            pass
+        
+        # Si el usuario tiene tareas entonces recorremos cada tarea
+        if tareas:
+            for linea_tarea in tareas:
+                tarea_cron =  linea_tarea.split()[-1] # Obtenemos solo el archivo que se esta ejecutando como cron
+                #ALARMA, se le notifica al administrador y se registra en el log
+                alarmas_log.alarmas_logger.warn('[ALARMA]: El usuario: ' + usuario + ' esta ejecutando el archivo: '+ tarea_cron + ' como CRON.')
+                enviar_correo('ALARMA/WARNING','TAREA COMO CRON', 'El usuario: ' + usuario + ' esta ejecutando el archivo: '+ tarea_cron + ' como CRON.')
+                
 def main():
     #verificar_md5sum(configuracion.dir_binarios)
     #tam_cola_correo()
@@ -586,7 +611,8 @@ def main():
     #si_sniffers()
     #verificar_log_access()
     #verificar_log_tcpdumps()
-    verificar_tmp()
+    #verificar_tmp()
+    #verificar_tarea_cron()
 
 if __name__=='__main__':
         main()
