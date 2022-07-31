@@ -22,7 +22,10 @@ import configuracion
 
 #Variables globales (varias)
 SERVIDOR = "smtp-mail.outlook.com"
-HIPS_CORREO_ADMIN = "ProyectodeHips@outlook.com"
+path = '/'.join((os.path.abspath(__file__).replace('\\', '/')).split('/')[:-1])
+config = configparser.ConfigParser()
+config.read(os.path.join(path, 'database.ini'))
+HIPS_CORREO_ADMIN = config['ADMIN']['HIPS_CORREO_ADMIN']
 HIPS_CORREO = "ProyectodeHips@outlook.com"
 HIPS_CONTRA = "AmparoyAmandaHIPS1."
 SSL_context = ssl.create_default_context()
