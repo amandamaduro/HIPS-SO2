@@ -1,0 +1,52 @@
+
+  <!DOCTYPE html>
+  <html>
+	<head>
+	  <meta charset="utf-8">
+	  <meta name="viewport" content="width=device-width, initial-scale=1">
+	  <title>HIPS</title>
+	  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.8.0/css/bulma.min.css">
+	  <script defer src="https://use.fontawesome.com/releases/v5.3.1/js/all.js"></script>
+	  <script type="text/javascript" >
+		function preventBack(){window.history.forward();}
+		 setTimeout("preventBack()", 0);
+		 window.onunload=function(){null};
+	 </script>
+	 <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+	</head>
+	<body>
+	  <section class="hero is-success is-fullheight">
+		<div class="hero-body">
+		  <div class="container">
+			<h1 class="title">
+			  OPCIONES HIPS
+			</h1>
+			<button><a href="/verificar_md5sum/">Verificar archivos binarios</a></button>
+			<button> <a href="/usuarios_conectados/">Verificar usuarios conectados</a></button>
+			<button><a href="/modo_promiscuo/">Chequear modo promiscuo</a></button>
+			<button><a href="/si_app_sniffers/">Chequear si hay sniffers</a></button>
+			<button><a href="/verificar_log_secure/">Verificar log secure</a></button>
+			<button><a href="/verificar_log_messages/">Verificar log messages</a></button>
+			<button><a href="/verificar_log_maillog/">Verificar log maillog</a></button>
+			<button><a href="/tam_cola_correo/">Verificar tama&#xF1;o de cola de mails</a></button>
+			<button><a href="/analizar_proceso/">Controlar consumo de memoria</a></button>
+			<button><a href="/verificar_tmp/">Verificar directorio /tmp</a></button>
+			<button><a href="/verificar_tarea_cron/">Examinar archivos cron</a></button>
+			<button><a href="/ssh_log_secure/">Verificar intentos de accesos</a></button><br><br>
+			<span>Proyecto SO2 - Amanda Maduro y Amparo Oliver - 2022</span>
+			<script
+			<script>
+			  Swal.fire({
+				  position: 'center',
+				  icon: 'info',
+				  text: "{{message}}",
+				  showConfirmButton: true,
+				  timer: 5000
+			  })
+		  </script>
+			</script>
+		  </div>
+		</div>
+	  </section>
+	</body>
+  </html>

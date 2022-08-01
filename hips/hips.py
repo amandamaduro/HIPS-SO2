@@ -94,6 +94,17 @@ def conexion_bd(op, arg1):
             return result
         except psycopg2.Error:
             print("ERROR.")
+    # Query para login web
+    elif op == 5: 
+        
+        try:
+            query = '''SELECT * FROM usuario;'''
+            cursor.execute(query)
+            result = cursor.fetchall()
+            #print(result)
+            return result
+        except psycopg2.Error:
+            print("Error")
 
     #Cerramos conexion con la base de datos 
     conexion.close()
@@ -174,6 +185,7 @@ def tam_cola_correo():
         # A modo de prueba ya que no tenemos nada en la cola
         enviar_correo('ALARMA/WARNING','CORREO COLA', 'La cola esta vacia') 
         alarmas_log.alarmas_logger.warn("La cola esta vacia")
+        return "La cola esta vacia"
     else:
         #Si no esta vacio, se verifica que supere el limite 
         mail_list = output.decode("utf-8").splitlines()
@@ -182,6 +194,7 @@ def tam_cola_correo():
             # Enviar correo a usuario y agregar al logger alarmas
             enviar_correo('ALARMA/WARNING','CORREO COLA', 'La cola de correo supera el limite establecido.')
             alarmas_log.alarmas_logger.warn("La cola de correo supera el limite establecido.")
+            return "La cola de correo supera el limite establecido."
 
 # Funcion para matar un proceso dato su PID
 def matar_proceso(pid):
@@ -211,7 +224,7 @@ def analizar_proceso():
                     # Se identifica como un proceso seguro
                     blanca = 1 
                     print("Proceso seguro")
-                    break
+                    return "Proceso seguro que supera. No se mata"
             # No se considera como un proceso seguro, se toman medidas
             if blanca == 0 : 
                 #ALARMA
@@ -223,6 +236,7 @@ def analizar_proceso():
                 matar_proceso(proceso_pid)
                 alarmas_log.prevencion_logger.warn('[PREVENCION]: Se mato el proceso ' + str_pid +' por alto consumo sospechoso.')
                 enviar_correo('PREVENCION','PROCESO SOSPECHOSO MATADO', 'Se mato el proceso ' + str_pid +' por alto consumo sospechoso.')
+                return 'Se mato el proceso ' + str_pid +' por alto consumo sospechoso.'
 
 def contra_random_generador():
     contrasenha_caracteres = string.ascii_letters + string.digits + string.punctuation
@@ -256,9 +270,12 @@ def verificar_log_secure():
                 p = subprocess.Popen("echo \"" + usuario + ":" + contra_random_nueva + "\" | chpasswd 2> /dev/null", stdout=subprocess.PIPE, shell=True)
                 (output, err) = p.communicate()
                 alarmas_log.prevencion_logger.warn('[PREVENCION]: Se cambio la contraseña del usuario ' + usuario +' por actividad sospechosa.')
-                enviar_correo('PREVENCION','CAMBIO DE CONTRASEÑA', 'Se cambio la contraseña del usuario ' + usuario +' por actividad sospechosa.')               
+                enviar_correo('PREVENCION','CAMBIO DE CONTRASEÑA', 'Se cambio la contraseña del usuario ' + usuario +' por actividad sospechosa.')
+                return '[ALARMA]: Multiples intentos fallidos de ingreso del usuario ' + usuario + '.' + '[PREVENCION]: Se cambio la contraseña del usuario ' + usuario +' por actividad sospechosa.'         
         else:
             contador_registro[usuario] = 1
+
+    return "No se detectaron problemas"
     
 #Funcion: Verificar los usuarios que están conectados. Alamcenarlos en una lista
 def usuarios_conectados():
@@ -329,9 +346,11 @@ def verificar_log_messages():
                 p = subprocess.Popen("echo \"" + usuario + ":" + contra_random_nueva + "\" | chpasswd 2> /dev/null", stdout=subprocess.PIPE, shell=True)
                 (output, err) = p.communicate()
                 alarmas_log.prevencion_logger.warn('[PREVENCION]: Se cambio la contraseña del usuario ' + usuario +' por actividad sospechosa.')
-                enviar_correo('PREVENCION','CAMBIO DE CONTRASEÑA', 'Se cambio la contraseña del usuario ' + usuario +' por actividad sospechosa.')               
+                enviar_correo('PREVENCION','CAMBIO DE CONTRASEÑA', 'Se cambio la contraseña del usuario ' + usuario +' por actividad sospechosa.')   
+                return 'Se cambio la contraseña del usuario ' + usuario +' por actividad sospechosa.'          
         else:
             contador_registro[usuario] = 1 
+        return "No se detectaron problemas"
 
 #Funcion que agrega correo a la lista negra
 def bloquear_correo(correo):
@@ -371,9 +390,11 @@ def verificar_log_maillog():
                 #Se bloquea el correo por precaucion
                 bloquear_correo(correo)
                 alarmas_log.prevencion_logger.warn('[PREVENCION]: Se bloqueo el correo:  ' + correo +' por envio masivo.')
-                enviar_correo('PREVENCION','CORREO BLOQUEADO', 'Se bloqueo el correo:  ' + correo +' por envio masivo.')               
+                enviar_correo('PREVENCION','CORREO BLOQUEADO', 'Se bloqueo el correo:  ' + correo +' por envio masivo.')  
+                return 'Se bloqueo el correo:  ' + correo +' por envio masivo.'             
         else:
             contador_registro[correo] = 1 
+    return "No se detectaron problemas"
 
 #Funcion: Deteccion de si la maquina se encuentra en modo promiscuo
 #       Analizamos el archivo var/log/messages
@@ -472,7 +493,9 @@ def si_app_sniffers():
 				#Registramos la eliminacion del proceso en el log de prevencion y se notifica
                 alarmas_log.prevencion_logger.warn('[PREVENCION]: Se elimino el proceso:  ' + p +' por captura de paquetes.')
                 enviar_correo('PREVENCION','PROCESO ELIMINADO Y ENVIADO A CUARENTENA', 'Proceso:  ' + p +' fue eliminado y enviado a cuarentena por capturar paquetes (Sniffer)') 			   
-
+                mensaje = 'Proceso:  ' + p +' fue eliminado y enviado a cuarentena por capturar paquetes (Sniffer)'
+                return mensaje
+    return "No se encontraron sniffers"
 #Funcion: Detectamos si la maquina entro en modo promiscuo segun los registros de auditoria
 def si_promisc_aud():
     comando = "sudo aureport --anomaly --input-logs | grep ANOM_PROMISCUOUS | awk '{print $5}' | grep -v '?' | sort | uniq"
@@ -564,6 +587,7 @@ def verificar_tmp():
                 enviar_correo('PREVENCION','ARCHIVO SOSPECHOSO', 'El archivo ejecutable:  ' + aux + ' se encuentra en cuarentena. Archivo sospechoso.')
                 #avisamos en la terminal que existe un ejecutable sospechoso en /tmp
                 os.system('echo "Ejecutable detectado:' +str(aux)+ ', notificado por correo. Por favor revisar"')
+                
     #Aplicamos el mismo proceso para el directorio /var/tmp
     for direccion,_,nombre_arch in os.walk('/var/tmp'):
         #Si encontramos algun archivo ejecutable dentro del directorio generamos la alarma al administrador 
@@ -578,7 +602,8 @@ def verificar_tmp():
                 enviar_correo('PREVENCION','ARCHIVO SOSPECHOSO', 'El archivo ejecutable:  ' + aux + ' se encuentra en cuarentena. Archivo sospechoso.')
                 #avisamos en la terminal que existe un ejecutable sospechoso en /tmp
                 os.system('echo "Ejecutable detectado: ' +str(aux)+ ' notificado por correo. Por favor revisar"')
-
+                return 'echo "Ejecutable detectado: ' +str(aux)+ ' notificado por correo. Por favor revisar"'
+    return "No se detectaron problemas"
 #Funcion que verifica si hay tareas ejecutandose como CRON
 def verificar_tarea_cron():
     #Se obtiene la informacion de usuarios
@@ -602,6 +627,8 @@ def verificar_tarea_cron():
                 #ALARMA, se le notifica al administrador y se registra en el log
                 alarmas_log.alarmas_logger.warn('[ALARMA]: El usuario: ' + usuario + ' esta ejecutando el archivo: '+ tarea_cron + ' como CRON.')
                 enviar_correo('ALARMA/WARNING','TAREA COMO CRON', 'El usuario: ' + usuario + ' esta ejecutando el archivo: '+ tarea_cron + ' como CRON.')
+                return 'El usuario: ' + usuario + ' esta ejecutando el archivo: '+ tarea_cron + ' como CRON.'
+    return "no se detectaron problemas"
                 
 #Funcion: Verificar intentos de accesos no válidos. Ya sea desde un mismo usuario
 #intentos repetitivos o desde un IP intentos de accesos con múltiples usuarios.
@@ -661,13 +688,15 @@ def ssh_log_secure():
                 alarmas_log.prevencion_logger.warn('Cambio de contrasenha de: ' + j[0][1][:-1] + ' a ' +nueva_contra +'por superar el maximo de intentos de acceso al sistema')
                 enviar_correo('[PREVENCION]','CAMBIO DE CONTRASEHNA', 'Cambio de contrasenha de: ' + j[0][1][:-1]+ ' por superar limite de intentos de acceso al sistema' + nueva_contra)
                 os.system('echo "\nIp supero los intentos de acceso. Notificacion al correo"')
+                return 'echo "\nIp supero los intentos de acceso. Notificacion al correo"'
             else:
                 #Si es root generamos alarma
                 alarmas_log.alarmas_logger.warn('Usuario root supero limite de intentos de acceso al sistema.' )
                 enviar_correo('ALARMA/WARNING','INTENTO DE ACCESO', 'Usuario root supero limite de intentos de acceso al sistema.')
                 os.system('echo " Usuario root supero los intentos de acceso. Notificacion al correo"')
+                return 'echo " Usuario root supero los intentos de acceso. Notificacion al correo"'
 
-def main():
+#def main():
     #verificar_md5sum(configuracion.dir_binarios)
     #tam_cola_correo()
     #analizar_proceso()
@@ -680,8 +709,8 @@ def main():
     #verificar_log_tcpdumps()
     #verificar_tmp()
     #verificar_tarea_cron()
-    ssh_log_secure()
+    #ssh_log_secure()
 
 
-if __name__=='__main__':
-        main()
+#if __name__=='__main__':
+        #main()
