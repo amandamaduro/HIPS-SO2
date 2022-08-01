@@ -145,7 +145,8 @@ def verificar_md5sum(dir_binarios):
             enviar_correo('ALARMA/WARNING','ARCHIVOS BINARIOS', 'Archivo modificado. Por favor revisar /var/log/hips/alarmas.log para mas informacion')
             return mensaje
     if aux==True:
-        print("Ningun archivo binario fue modificado. ")
+        mensaje="Ningun archivo binario fue modificado. "
+        return mensaje
 
 #Funcion: para comparar los hash que estan en la BD y los generados por el hips
 #Param: hash de la BD y hash del hips
@@ -313,6 +314,10 @@ def verificar_usuarios():
             print("No coinciden los datos del usuario. No se encuentra en la base de datos")
             alarmas_log.alarmas_logger.warn("Usuario no esta regisstrado en la base de datos. Posibilidad de intrusion. Datos:"+usuario+'Origen: ['+origen+']')
             enviar_correo('ALARMA/WARNING','USUARIO DESCONOCIDO', 'Conexion de un usuario no registrado. Por favor revisar /var/log/hips/alarmas.log para mas informacion')
+            mensaje="Conexion de un usuario no registrado. Revise correo"
+        else:
+            mensaje="Los usuarios que estan conectados estan habilitados"
+        return mensaje
 
 def verificar_log_messages():
 
@@ -441,11 +446,12 @@ def modo_promiscuo():
             #Analizamos si se prendio y no apago
             if contador[d]%2 != 0:
                 disp_on.append(d)
+                mensaje="Maquina en modo promiscuo"
         for d in disp_on:
             print(d+ ": En modo promiscuo")
             alarmas_log.alarmas_logger.warn('Se ha detectado dispositivo' +d +'se encuentra en modo promiscuo')
             enviar_correo('ALARMA/WARNING','DISPOSITIVO MODO PROMISCUO', 'Se ha detectado que el/los dispositivo/s se encuentra en modo promiscuo. Revise /var/log/hips/alarmas.log para mas informacion.')
-
+        return (mensaje)
     else:
         mensaje='La maquina no esta en modo promiscuo'
         print(mensaje)
@@ -493,11 +499,14 @@ def si_app_sniffers():
 				#Registramos la eliminacion del proceso en el log de prevencion y se notifica
                 alarmas_log.prevencion_logger.warn('[PREVENCION]: Se elimino el proceso:  ' + p +' por captura de paquetes.')
                 enviar_correo('PREVENCION','PROCESO ELIMINADO Y ENVIADO A CUARENTENA', 'Proceso:  ' + p +' fue eliminado y enviado a cuarentena por capturar paquetes (Sniffer)') 			   
-                mensaje = 'Proceso:  ' + p +' fue eliminado y enviado a cuarentena por capturar paquetes (Sniffer)'
-                return mensaje
-    return "No se encontraron sniffers"
+            mensaje = 'Proceso eliminado y enviado a cuarentena por capturar paquetes (Sniffer). Revise correo.'
+        else:
+            mensaje="No se encontraron sniffers en ejecucion"
+        return mensaje
+
 #Funcion: Detectamos si la maquina entro en modo promiscuo segun los registros de auditoria
 def si_promisc_aud():
+    mensaje = "La maquina no esta en modo promiscuo"
     comando = "sudo aureport --anomaly --input-logs | grep ANOM_PROMISCUOUS | awk '{print $5}' | grep -v '?' | sort | uniq"
     c = delegator.run(comando)
     lista = c.out.split()
@@ -512,6 +521,8 @@ def si_promisc_aud():
         #Registramos la cuarentena en el log de prevencion y enviamos al mail
         alarmas_log.prevencion_logger.warn('[PREVENCION]: Se elimino el proceso:  ' + l +'. Causante de que la maquina se encuentre en modo promiscuo.')
         enviar_correo('PREVENCION','PROCESO ELIMINADO Y EN CUARENTENA (MODO PROMISCUO)', 'Proceso:  ' + l + '. Causante de que la maquina se encuentre en modo promiscuo.')
+        mensaje="Modo promiscuo detectado. Revise correo"
+    return mensaje
 
 #Funcion: Chequeo completo de modo promiscuo o sniffers en ejecucion 
 def si_sniffers(): 
@@ -531,6 +542,7 @@ def verificar_log_access():
     registro = os.popen(cmd).read().split('\n')
     registro.pop(-1)
     contador = {}
+    mensaje = "No se encontraron usuarios con accesos no debidos"
     for linea in registro:
         ip =  linea.split()[0]
         
@@ -542,15 +554,17 @@ def verificar_log_access():
                 bloquear_ip(ip) 
                 alarmas_log.prevencion_logger.warn('[PREVENCION]: Se bloqueo la ip: ' + ip +' por multiples errores de carga de paginas.')
                 enviar_correo('PREVENCION','IP BLOQUEADA', 'Se bloqueo la ip: ' + ip +' por multiples errores de carga de paginas.')
-
+                mensaje="Usuario bloqueado, revisar correo."
         else:
             contador[ip] = 1
+    return mensaje
 
 def verificar_log_tcpdumps():
     registro = os.popen("sudo cat /home/amparooliver/Descargas/tcpdump_dns.log").read().split('\n')
     registro.pop(-1)
 
     contador = {}
+    mensaje = "No se encontraron ataques DDOS"
 
     for linea in registro:
         #Formato
@@ -568,12 +582,15 @@ def verificar_log_tcpdumps():
                 bloquear_ip(ip) 
                 alarmas_log.prevencion_logger.warn('[PREVENCION]: Se bloqueo la ip: ' + ip +' por multiples errores de carga de paginas.')
                 enviar_correo('PREVENCION','IP BLOQUEADA', 'Se bloqueo la ip: ' + ip +' por multiples errores de carga de paginas.')    
+                mensaje= "Ataque DDOS, revise correo."
         else:
             contador[(ip_a, ip_b)] = 1
+        return mensaje
 
 #Funcion: Verificar directorio /tmp; que no hayan procesos con nombres extraños o scripts ubicados en el mismo.
 #         Si se dectecta algun se manda a cuarentena 
 def verificar_tmp():
+    mensaje="No hay ejecutables en /tmp"
     for direccion,_,nombre_arch in os.walk('/tmp'):
         #Si encontramos algun archivo ejecutable dentro del directorio se notifica y se mueve a cuarentena 
         for aux in nombre_arch:
@@ -587,8 +604,10 @@ def verificar_tmp():
                 enviar_correo('PREVENCION','ARCHIVO SOSPECHOSO', 'El archivo ejecutable:  ' + aux + ' se encuentra en cuarentena. Archivo sospechoso.')
                 #avisamos en la terminal que existe un ejecutable sospechoso en /tmp
                 os.system('echo "Ejecutable detectado:' +str(aux)+ ', notificado por correo. Por favor revisar"')
+                mensaje="Ejecutable detectado, enviado a cuarentena"
                 
     #Aplicamos el mismo proceso para el directorio /var/tmp
+    mensaje="No se encontraron ejecutables en /var/tmp"
     for direccion,_,nombre_arch in os.walk('/var/tmp'):
         #Si encontramos algun archivo ejecutable dentro del directorio generamos la alarma al administrador 
         #Y colocamos en cuarentena el ejecutable
@@ -602,8 +621,8 @@ def verificar_tmp():
                 enviar_correo('PREVENCION','ARCHIVO SOSPECHOSO', 'El archivo ejecutable:  ' + aux + ' se encuentra en cuarentena. Archivo sospechoso.')
                 #avisamos en la terminal que existe un ejecutable sospechoso en /tmp
                 os.system('echo "Ejecutable detectado: ' +str(aux)+ ' notificado por correo. Por favor revisar"')
-                return 'echo "Ejecutable detectado: ' +str(aux)+ ' notificado por correo. Por favor revisar"'
-    return "No se detectaron problemas"
+                mensaje="Ejecutable detectado, enviado a cuarentena. Revise correo"
+    return mensaje
 #Funcion que verifica si hay tareas ejecutandose como CRON
 def verificar_tarea_cron():
     #Se obtiene la informacion de usuarios
@@ -637,6 +656,7 @@ def ssh_log_secure():
     contra_fallada = os.popen("cat /var/log/secure | grep 'Failed password'").read()
     contra_fallada = contra_fallada.split(os.linesep)
     contador = []
+    mensaje="No se detectaron problemas"
     #Recorremos archivo
     for fila_log in contra_fallada[:-1]:
         #Capturamos la ip si encontramos la frase "for invalid user"
@@ -662,6 +682,7 @@ def ssh_log_secure():
             os.system('echo "\nIp supero los intentos de acceso, ip bloqueado. Revise el correo para mas informacion"')
             #Bloqueamos ip
             bloquear_ip(j[0][1])
+            mensaje="Ip supero los intentos de acceso, ip bloqueado. Revise el correo para mas informacion"
     #Extraemos las entradas con acceso fallido
     acceso_fallado = os.popen('cat /var/log/secure | grep "FAILED LOGIN"').read()
     acceso_fallado = acceso_fallado.split(os.linesep)
@@ -688,13 +709,14 @@ def ssh_log_secure():
                 alarmas_log.prevencion_logger.warn('Cambio de contrasenha de: ' + j[0][1][:-1] + ' a ' +nueva_contra +'por superar el maximo de intentos de acceso al sistema')
                 enviar_correo('[PREVENCION]','CAMBIO DE CONTRASEHNA', 'Cambio de contrasenha de: ' + j[0][1][:-1]+ ' por superar limite de intentos de acceso al sistema' + nueva_contra)
                 os.system('echo "\nIp supero los intentos de acceso. Notificacion al correo"')
-                return 'echo "\nIp supero los intentos de acceso. Notificacion al correo"'
+                mensaje="\nIp supero los intentos de acceso. Notificacion al correo"
             else:
                 #Si es root generamos alarma
                 alarmas_log.alarmas_logger.warn('Usuario root supero limite de intentos de acceso al sistema.' )
                 enviar_correo('ALARMA/WARNING','INTENTO DE ACCESO', 'Usuario root supero limite de intentos de acceso al sistema.')
                 os.system('echo " Usuario root supero los intentos de acceso. Notificacion al correo"')
-                return 'echo " Usuario root supero los intentos de acceso. Notificacion al correo"'
+                mensaje=" Usuario root supero los intentos de acceso. Notificacion al correo"
+    return mensaje
 
 #def main():
     #verificar_md5sum(configuracion.dir_binarios)
