@@ -194,4 +194,6 @@ python3 configuracion.py
 ## Conexion al sistema
 </summary>
 
+Ejecute el archivo **servidor.py** y en la terminal le va a indicar a que link debe conectarse, despues ingrese y pruebe nuestro sistema HIPS. Es recomendable ejecutarlo desde un usuario root.
+
 </details>
