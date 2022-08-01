@@ -133,7 +133,7 @@ def insertar_usuarios():
         cursor = conexion.cursor()   				   
         cursor.execute("DROP TABLE IF EXISTS usuario") 	   
         # creamos la tabla usuario 
-        cursor.execute("CREATE TABLE usuario(id SERIAL, username VARCHAR, ip VARCHAR)") 
+        cursor.execute("CREATE TABLE usuario(id SERIAL, username VARCHAR, ip VARCHAR, password VARCHAR)") 
         print("Tabla de usuario creada con exito.")
     except:
         print("No se pudo crear la tabla de usuario")
@@ -149,7 +149,7 @@ def insertar_usuarios():
             #Colocamos cada campo en un vector
             vector = aux.split(' ') 
             try:
-                cursor.execute("INSERT INTO usuario(username, ip) VALUES (%s,%s)",(vector[0],vector[1]) )
+                cursor.execute("INSERT INTO usuario(username, ip, password) VALUES (%s,%s,%s)",(vector[0],vector[1],vector[2]) )
                 print("Se cargo con exito los usuarios")
             except psycopg2.Error as error:
                 print("Error: {}".format(error))
