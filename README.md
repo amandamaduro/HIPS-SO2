@@ -169,6 +169,20 @@ sudo systemctl start ssh
 ## Pasos finales
 </summary>
 
+Debe crear un archivo con el nombre **"database.ini"** para poder acceder a datos del administrados de HIPS, este debe ser de la siguiente forma
+```ini
+; Archivo para configuraciones de HIPS
+
+[DEFAULT]
+DB_NAME = hips
+DB_USER = postgres
+DB_PASSWORD = 
+
+[ADMIN]
+HIPS_CORREO_ADMIN = 
+```
+Los campos que no estan completados, se deberan completar con los datos del administrador
+
 Antes que nada, para poblar la base de datos y crear los directorios con los archivos .log debemos ejecutar desde root:
 ```python
 python3 configuracion.py
